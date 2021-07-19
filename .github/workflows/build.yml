@@ -1,0 +1,66 @@
+name: CI of NewPlugin
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+  schedule:
+    # Run on Sunday, Tuesday and Thursday nights
+    - cron: '0 23 * * 0,1,4'
+
+jobs:
+
+  clang-format:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install clang-format-10
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get -qq install clang-format-10
+    - name: Run clang-format-check
+      run: |
+        ./.clang-format-check.sh
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # FIXME Windows build disabled for now until vcpkg is updated
+        os: [ubuntu-18.04, ubuntu-20.04, macos-latest]
+        build-type: [RelWithDebInfo]
+        compiler: [gcc]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Setup extra APT mirror
+      if: startsWith(runner.os, 'Linux')
+      run: |
+        set -x
+        set -e
+        curl -1sLf 'https://dl.cloudsmith.io/public/mc-rtc/head/setup.deb.sh' | sudo -E bash
+    - name: Install dependencies
+      uses: jrl-umi3218/github-actions/install-dependencies@master
+      with:
+        compiler: ${{ matrix.compiler }}
+        build-type: ${{ matrix.build-type }}
+        ubuntu: |
+          apt: libmc-rtc-dev
+        macos: |
+          brew-taps: mc-rtc/mc-rtc
+          brew: gcc mc_rtc
+        windows: |
+          vcpkg:
+            repo: jrl-umi3218/vcpkg
+            user: ${{ github.actor }}
+            token: ${{ github.token }}
+    - name: Build and test
+      uses: jrl-umi3218/github-actions/build-cmake-project@master
+      with:
+        compiler: ${{ matrix.compiler }}
+        build-type: ${{ matrix.build-type }}
