@@ -29,8 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # FIXME Windows build disabled for now until vcpkg is updated
-        os: [ubuntu-18.04, ubuntu-20.04, macos-latest]
+        os: [ubuntu-18.04, ubuntu-20.04, macos-latest, windows-latest]
         build-type: [RelWithDebInfo]
         compiler: [gcc]
     runs-on: ${{ matrix.os }}
@@ -38,12 +37,6 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
-    - name: Setup extra APT mirror
-      if: startsWith(runner.os, 'Linux')
-      run: |
-        set -x
-        set -e
-        curl -1sLf 'https://dl.cloudsmith.io/public/mc-rtc/head/setup.deb.sh' | sudo -E bash
     - name: Install dependencies
       uses: jrl-umi3218/github-actions/install-dependencies@master
       with:
@@ -51,14 +44,20 @@ jobs:
         build-type: ${{ matrix.build-type }}
         ubuntu: |
           apt: libmc-rtc-dev
+          apt-mirrors:
+            mc-rtc:
+              cloudsmith: mc-rtc/head
         macos: |
           brew-taps: mc-rtc/mc-rtc
-          brew: gcc mc_rtc
+          brew: mc_rtc
         windows: |
           vcpkg:
-            repo: jrl-umi3218/vcpkg
-            user: ${{ github.actor }}
-            token: ${{ github.token }}
+            repo: microsoft/vcpkg
+            owner: mc-rtc
+            token: "${{ secrets.GITHUB_TOKEN }}"
+            registries:
+            - repo: mc-rtc/vcpkg-registry
+              packages: [ spacevecalg, rbdyn, eigen-qld, sch-core, tasks, mc-rbdyn-urdf, mc-rtc-data, eigen-quadprog, state-observation, hpp-spline, mc-rtc ]
     - name: Build and test
       uses: jrl-umi3218/github-actions/build-cmake-project@master
       with:
